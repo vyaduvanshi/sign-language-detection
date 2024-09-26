@@ -1,2 +1,2 @@
 # sign-language-detection
-Indian Sign Language (ISL) detection using ML
+A simple webapp that detects Indian Sign Language (ISL) using ML
