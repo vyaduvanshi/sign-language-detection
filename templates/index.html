@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="mb-4">Sign Language Detection</h1>
+<div id="flash-message" class="alert alert-warning" style="display: none;">No hands detected</div>
+<div class="row">
+    <div class="col-md-8">
+        <div id="timer-container" class="mb-2">
+            <div id="timer-bar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+        <img id="video-feed" src="{{ url_for('video_feed') }}" width="100%">
+    </div>
+    <div class="col-md-4">
+        <div class="detected-signs">
+            <h2>Detected Alphabets</h2>
+            <ul id="detected-signs-list" class="list-group">
+                <!-- Detected signs will be added here dynamically -->
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+let lastSign = null;
+let timer = 0;
+const DETECTION_THRESHOLD = 3000; // 3 seconds in milliseconds
+let timerInterval;
+let flashTimeout;
+
+function updateDetectedSigns(sign) {
+    if (sign === "No hands detected") {
+        showFlashMessage();
+        clearInterval(timerInterval);
+        timer = 0;
+        updateTimerBar();
+    } else {
+        hideFlashMessage();
+        if (sign !== lastSign) {
+            lastSign = sign;
+            timer = 0;
+            clearInterval(timerInterval);
+            timerInterval = setInterval(incrementTimer, 100);
+        }
+    }
+}
+
+function incrementTimer() {
+    timer += 100;
+    updateTimerBar();
+    
+    if (timer >= DETECTION_THRESHOLD) {
+        addSignToList(lastSign);
+        clearInterval(timerInterval);
+        timer = 0;
+        updateTimerBar();
+    }
+}
+
+function updateTimerBar() {
+    const percentage = (timer / DETECTION_THRESHOLD) * 100;
+    document.getElementById('timer-bar').style.width = `${percentage}%`;
+    document.getElementById('timer-bar').setAttribute('aria-valuenow', percentage);
+}
+
+function addSignToList(sign) {
+    const list = document.getElementById('detected-signs-list');
+    const listItem = document.createElement('li');
+    listItem.className = 'list-group-item';
+    listItem.textContent = sign;
+    list.insertBefore(listItem, list.firstChild);
+}
+
+function showFlashMessage() {
+    const flashMessage = document.getElementById('flash-message');
+    flashMessage.style.display = 'block';
+    clearTimeout(flashTimeout);
+    flashTimeout = setTimeout(() => {
+        flashMessage.style.display = 'none';
+    }, 3000); // Hide after 3 seconds
+}
+
+function hideFlashMessage() {
+    const flashMessage = document.getElementById('flash-message');
+    flashMessage.style.display = 'none';
+    clearTimeout(flashTimeout);
+}
+
+function fetchCurrentSign() {
+    fetch('/current_sign')
+        .then(response => response.json())
+        .then(data => {
+            if (data.sign) {
+                updateDetectedSigns(data.sign);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+function addSignToList(sign) {
+    const list = document.getElementById('detected-signs-list');
+    const listItem = document.createElement('li');
+    listItem.className = 'list-group-item';
+    listItem.textContent = sign;
+    list.insertBefore(listItem, list.firstChild);
+
+    // Send the sign to the server to be added to history
+    fetch('/add_sign', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ sign: sign }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status !== 'success') {
+            console.error('Failed to add sign to history:', data.message);
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+// Fetch the current sign every 100ms
+setInterval(fetchCurrentSign, 100);
+</script>
+{% endblock %}
